@@ -1,0 +1,1105 @@
+<!DOCTYPE html>
+<html lang="" xml:lang="">
+  <head>
+    <title>IOWA dbase</title>
+    <meta charset="utf-8" />
+    <script src="index_files/header-attrs-2.23/header-attrs.js"></script>
+    <link href="index_files/panelset-0.2.6/panelset.css" rel="stylesheet" />
+    <script src="index_files/panelset-0.2.6/panelset.js"></script>
+    <script src="index_files/xaringanExtra_fit-screen-0.2.6/fit-screen.js"></script>
+    <script src="index_files/htmlwidgets-1.6.2/htmlwidgets.js"></script>
+    <script src="index_files/viz-1.8.2/viz.js"></script>
+    <link href="index_files/DiagrammeR-styles-0.2/styles.css" rel="stylesheet" />
+    <script src="index_files/grViz-binding-1.0.10/grViz.js"></script>
+    <link rel="stylesheet" href="xaringan-themer.css" type="text/css" />
+  </head>
+  <body>
+    <textarea id="source">
+
+
+
+
+
+class: inverse, center, middle
+
+
+# Wrangling telemetry data
+
+
+&lt;img src="images/GLATOS_receivers.png" width="500px"/&gt;
+
+
+Todd Hayden, Tom Binder, Chris Vandergoot
+
+Iowa Telemetry Workshop | 2023-07-18
+
+---
+layout: true
+background-image: url(images/GLATOS_logo.png)
+background-position: 5% 95%
+background-size: 10%
+
+
+---
+
+# Wrangling telemetry data
+
+### Output
+  1. Detections with animal metadata (ID, length, weight, etc)
+  2. Detections with location (lat/lon)
+  3. Transmissions before after receiver recovery are removed
+  4. Tags that are not associated with fish area removed
+
+#### AND
+
+  3. Standardized column names and data types
+
+---
+
+# GLATOS database
+
+&lt;center&gt;
+
+<div class="grViz html-widget html-fill-item-overflow-hidden html-fill-item" id="htmlwidget-e0cba308ae404effeb60" style="width:504px;height:504px;"></div>
+<script type="application/json" data-for="htmlwidget-e0cba308ae404effeb60">{"x":{"diagram":"digraph {\n\ngraph [layout = \"dot\",\n       outputorder = \"edgesfirst\",\n       bgcolor = \"#E9EBEE\",\n       concentrate = \"true\"]\n\nnode [fontname = \"Helvetica\",\n      fontsize = \"10\",\n      shape = \"circle\",\n      fixedsize = \"true\",\n      width = \"0.5\",\n      style = \"filled\",\n      fillcolor = \"aliceblue\",\n      color = \"gray70\",\n      fontcolor = \"gray50\"]\n\nedge [fontname = \"Helvetica\",\n     fontsize = \"8\",\n     len = \"1.5\",\n     color = \"gray80\",\n     arrowsize = \"0.5\"]\n\n  \"1\" [label = \"Project wkbk\", fixedsize = \"FALSE\", shape = \"rectangle\", fillcolor = \"#F0F8FF\", fontcolor = \"#000000\"] \n  \"2\" [label = \"Tagging\", fixedsize = \"FALSE\", shape = \"circle\", fillcolor = \"#F0F8FF\", fontcolor = \"#000000\"] \n  \"3\" [label = \"R. deployment\", fixedsize = \"FALSE\", shape = \"circle\", fillcolor = \"#F0F8FF\", fontcolor = \"#000000\"] \n  \"4\" [label = \"R. recovery\", fixedsize = \"FALSE\", shape = \"circle\", fillcolor = \"#F0F8FF\", fontcolor = \"#000000\"] \n  \"5\" [label = \"dbase\", fixedsize = \"FALSE\", shape = \"circle\", fillcolor = \"#F0F8FF\", fontcolor = \"#000000\"] \n  \"6\" [label = \"dtc\", fixedsize = \"FALSE\", shape = \"circle\", fillcolor = \"#F0F8FF\", fontcolor = \"#000000\"] \n  \"7\" [label = \"dtc export\", fixedsize = \"FALSE\", shape = \"circle\", fillcolor = \"#F0F8FF\", fontcolor = \"#000000\"] \n  \"1\"->\"2\" \n  \"1\"->\"3\" \n  \"1\"->\"4\" \n  \"2\"->\"5\" \n  \"3\"->\"5\" \n  \"4\"->\"5\" \n  \"6\"->\"5\" \n  \"5\"->\"7\" \n}","config":{"engine":"dot","options":null}},"evals":[],"jsHooks":[]}</script>
+&lt;/center&gt;
+
+---
+
+# Steps for data processing
+1. Combine receiver deployment and recovery
+
+--
+
+2. Add receiver latitude and longitude to detections
+
+--
+
+3. Add animal metadata (id, length, weight)
+
+--
+
+4. **Remove detections when receivers were not deployed**
+
+5. **Remove detections that are not assigned to fish**
+
+---
+
+
+# `glatos` package
+
+### Install instructions:
+https://github.com/ocean-tracking-network/glatos/wiki/installation-instructions
+
+- `library(remotes)`
+- `install_github('ocean-tracking-network/glatos')`
+
+### After install:
+
+- `library(glatos)`
+
+---
+
+# Resources
+
+## Data loading
+
+- `vignette(package="glatos", topic="data_loading_vignette")`
+
+## Data requirements
+
+- Required column names, data types, format
+
+- `vignette(package="glatos", topic="data_requirements_vignette")`
+  
+---
+
+# `GLATOS` functions for loading data
+
+
+1. **`read_glatos_detections`**
+
+     + read detection data from a CSV file, source- GLATOS Data Portal 
+
+2. `read_otn_detections`
+     + read detection data from a CSV file, source- Ocean Tracking Network 
+
+3. `read_glatos_receivers`
+     + read receiver data from a CSV file, source-  GLATOS Data Portal
+
+---
+
+# `GLATOS` functions for loading data
+
+4. `read_glatos_workbook`
+     
+	 + read data from a GLATOS project-specific MS Excel workbook (\*.xlsm file), source- GLATOS Data Portal
+  
+5. `read_vemco_tag_specs`
+     
+	 + read tag specification data from an MS Excel workbook (\*.xls file), source- Innovasea
+
+---
+# Converting data to glatos detection export output
+
+1. Load data into R using some other function (e.g., *read_csv*)
+
+2. Modify data to ensure that all requirements of the desired function are met
+
+## R packages
+
+- `lubridate` - fast functions for handling time/dates in R
+  - https://lubridate.tidyverse.org/
+
+---
+
+# R packages
+
+- `data.table` - Extension of data.table, very fast, good for large data
+
+  - https://rdatatable.gitlab.io/data.table/
+  
+  - "left join" - join two tables on keys
+  
+  - "left" table only joined if match in "right" table
+  
+  - All records in "left" table are retained
+  
+  - `data.table` - x[i, on = "keys"] where x and i are data.tables
+  
+  - `data.table` is also a `data.frame`
+
+---
+
+# GLATOS database
+
+&lt;center&gt;
+
+<div class="grViz html-widget html-fill-item-overflow-hidden html-fill-item" id="htmlwidget-4c5f4e38dae7a3d1a675" style="width:504px;height:504px;"></div>
+<script type="application/json" data-for="htmlwidget-4c5f4e38dae7a3d1a675">{"x":{"diagram":"digraph {\n\ngraph [layout = \"dot\",\n       outputorder = \"edgesfirst\",\n       bgcolor = \"#E9EBEE\",\n       concentrate = \"true\"]\n\nnode [fontname = \"Helvetica\",\n      fontsize = \"10\",\n      shape = \"circle\",\n      fixedsize = \"true\",\n      width = \"0.5\",\n      style = \"filled\",\n      fillcolor = \"aliceblue\",\n      color = \"gray70\",\n      fontcolor = \"gray50\"]\n\nedge [fontname = \"Helvetica\",\n     fontsize = \"8\",\n     len = \"1.5\",\n     color = \"gray80\",\n     arrowsize = \"0.5\"]\n\n  \"1\" [label = \"Project wkbk\", fixedsize = \"FALSE\", shape = \"rectangle\", fillcolor = \"#F0F8FF\", fontcolor = \"#000000\"] \n  \"2\" [label = \"Tagging\", fixedsize = \"FALSE\", shape = \"circle\", fillcolor = \"#F0F8FF\", fontcolor = \"#000000\"] \n  \"3\" [label = \"R. deployment\", fixedsize = \"FALSE\", shape = \"circle\", fillcolor = \"#F0F8FF\", fontcolor = \"#000000\"] \n  \"4\" [label = \"R. recovery\", fixedsize = \"FALSE\", shape = \"circle\", fillcolor = \"#F0F8FF\", fontcolor = \"#000000\"] \n  \"5\" [label = \"dbase\", fixedsize = \"FALSE\", shape = \"circle\", fillcolor = \"#F0F8FF\", fontcolor = \"#000000\"] \n  \"6\" [label = \"dtc\", fixedsize = \"FALSE\", shape = \"circle\", fillcolor = \"#F0F8FF\", fontcolor = \"#000000\"] \n  \"7\" [label = \"dtc export\", fixedsize = \"FALSE\", shape = \"circle\", fillcolor = \"#F0F8FF\", fontcolor = \"#000000\"] \n  \"1\"->\"2\" \n  \"1\"->\"3\" \n  \"1\"->\"4\" \n  \"2\"->\"5\" \n  \"3\"->\"5\" \n  \"4\"->\"5\" \n  \"6\"->\"5\" \n  \"5\"->\"7\" \n}","config":{"engine":"dot","options":null}},"evals":[],"jsHooks":[]}</script>
+&lt;/center&gt;
+
+---
+
+# Receiver location data
+
+.pull-left[
+## Required columns
+- deploy_lat (numeric)
+- deploy_long (numeric)
+- recover_date_time (POSIXct timestamp)
+- deploy_date_time (POSIXct timestamp)
+]
+
+.pull-right[
+## Optional columns
+- glatos_array (character)
+- station (character)
+- glatos_project_receiver (character)
+]
+
+.center[
+### Any data.frame that contains the columns above in the correct format should work with glatos functions that require receiver location data
+]
+---
+
+# Prepare receiver deployment records
+.panelset[
+.panel[.panel-name[Load]
+
+
+```r
+# load libraries
+library(data.table)
+library(lubridate)
+
+# load example receiver deployments
+rec_dep &lt;- data.table::fread("ex_glatos_submission/HECWL_GLATOS_Deployment.csv")
+```
+]
+
+.panel[.panel-name[Peek]
+
+```
+## Classes 'data.table' and 'data.frame':	588 obs. of  33 variables:
+##  $ GLATOS_ARRAY             : chr  "AGR" "AGR" "AGR" "AGR" ...
+##  $ OTN_ARRAY                : logi  NA NA NA NA NA NA ...
+##  $ STATION_NO               : int  1 1 2 2 1 1 1 2 2 3 ...
+##  $ CONSECUTIVE_DEPLOY_NO    : int  1 2 1 2 2 3 1 1 2 1 ...
+##  $ MOORING_DROP_DEAD_DATE   : logi  NA NA NA NA NA NA ...
+##  $ INTEND_LAT               : logi  NA NA NA NA NA NA ...
+##  $ INTEND_LONG              : logi  NA NA NA NA NA NA ...
+##  $ OTN_MISSION_ID           : logi  NA NA NA NA NA NA ...
+##  $ DEPLOY_DATE_TIME         : logi  NA NA NA NA NA NA ...
+##  $ GLATOS_DEPLOY_DATE_TIME  : chr  "2013-03-28 10:50" "2013-09-18 09:40" "2013-03-28 11:15" "2013-09-18 11:00" ...
+##  $ GLATOS_TIMEZONE          : chr  "Eastern" "Eastern" "Eastern" "Eastern" ...
+##  $ DEPLOY_LAT               : num  44 44 44 44 45.7 ...
+##  $ DEPLOY_LONG              : num  -83.7 -83.7 -83.7 -83.7 -84.4 ...
+##  $ BOTTOM_DEPTH             : logi  NA NA NA NA NA NA ...
+##  $ RISER_LENGTH             : logi  NA NA NA NA NA NA ...
+##  $ INSTRUMENT_DEPTH         : logi  NA NA NA NA NA NA ...
+##  $ CHECWLK_COMPLETE_TIME    : logi  NA NA NA NA NA NA ...
+##  $ STATUS_IN                : logi  NA NA NA NA NA NA ...
+##  $ INS_MODEL_NO             : chr  "VR2W" "VR2W" "VR2W" "VR2W" ...
+##  $ GLATOS_INS_FREQUENCY     : int  69 69 69 69 69 69 69 69 69 69 ...
+##  $ INS_SERIAL_NO            : int  109458 109459 109459 109458 109969 113223 109874 109492 109499 109908 ...
+##  $ RCV_MODEM_ADDRESS        : logi  NA NA NA NA NA NA ...
+##  $ SYNC_DATE_TIME           : logi  NA NA NA NA NA NA ...
+##  $ MEMORY_ERASED_AT_DEPLOY  : logi  NA NA NA NA NA NA ...
+##  $ RCV_BATTERY_INSTALL_DATE : logi  NA NA NA NA NA NA ...
+##  $ RCV_EXPECTED_BATTERY_LIFE: logi  NA NA NA NA NA NA ...
+##  $ RCV_VOLTAGE_AT_DEPLOY    : logi  NA NA NA NA NA NA ...
+##  $ RCV_TILT_AFTER_DEPLOY    : logi  NA NA NA NA NA NA ...
+##  $ DEPLOYED_BY              : logi  NA NA NA NA NA NA ...
+##  $ COMMENTS                 : logi  NA NA NA NA NA NA ...
+##  $ GLATOS_SEASONAL          : chr  "YES" "YES" "YES" "YES" ...
+##  $ GLATOS_PROJECT           : chr  "HECWL" "HECWL" "HECWL" "HECWL" ...
+##  $ GLATOS_VPS               : chr  "NO" "NO" "NO" "NO" ...
+##  - attr(*, ".internal.selfref")=&lt;externalptr&gt;
+```
+]
+
+.panel[.panel-name[Process]
+
+
+```r
+# Need to calculate recover_date_time from GLATOS_recover_date_time and GLATOS_timezone
+rec_dep[, DEPLOY_DATE_TIME := fast_strptime(GLATOS_DEPLOY_DATE_TIME,
+                                             format = "%Y-%m-%d %H:%M",
+                                             tz = "America/Detroit", lt = FALSE)]
+
+rec_dep[, STATION := paste(GLATOS_ARRAY, STATION_NO, sep = "-")]
+
+rec_dep[, INS_SERIAL_NO := as.character(INS_SERIAL_NO)]
+```
+]
+
+.panel[.panel-name[Output]
+
+```
+## Classes 'data.table' and 'data.frame':	588 obs. of  34 variables:
+##  $ GLATOS_ARRAY             : chr  "AGR" "AGR" "AGR" "AGR" ...
+##  $ OTN_ARRAY                : logi  NA NA NA NA NA NA ...
+##  $ STATION_NO               : int  1 1 2 2 1 1 1 2 2 3 ...
+##  $ CONSECUTIVE_DEPLOY_NO    : int  1 2 1 2 2 3 1 1 2 1 ...
+##  $ MOORING_DROP_DEAD_DATE   : logi  NA NA NA NA NA NA ...
+##  $ INTEND_LAT               : logi  NA NA NA NA NA NA ...
+##  $ INTEND_LONG              : logi  NA NA NA NA NA NA ...
+##  $ OTN_MISSION_ID           : logi  NA NA NA NA NA NA ...
+##  $ DEPLOY_DATE_TIME         : POSIXct, format: "2013-03-28 10:50:00" "2013-09-18 09:40:00" "2013-03-28 11:15:00" "2013-09-18 11:00:00" ...
+##  $ GLATOS_DEPLOY_DATE_TIME  : chr  "2013-03-28 10:50" "2013-09-18 09:40" "2013-03-28 11:15" "2013-09-18 11:00" ...
+##  $ GLATOS_TIMEZONE          : chr  "Eastern" "Eastern" "Eastern" "Eastern" ...
+##  $ DEPLOY_LAT               : num  44 44 44 44 45.7 ...
+##  $ DEPLOY_LONG              : num  -83.7 -83.7 -83.7 -83.7 -84.4 ...
+##  $ BOTTOM_DEPTH             : logi  NA NA NA NA NA NA ...
+##  $ RISER_LENGTH             : logi  NA NA NA NA NA NA ...
+##  $ INSTRUMENT_DEPTH         : logi  NA NA NA NA NA NA ...
+##  $ CHECWLK_COMPLETE_TIME    : logi  NA NA NA NA NA NA ...
+##  $ STATUS_IN                : logi  NA NA NA NA NA NA ...
+##  $ INS_MODEL_NO             : chr  "VR2W" "VR2W" "VR2W" "VR2W" ...
+##  $ GLATOS_INS_FREQUENCY     : int  69 69 69 69 69 69 69 69 69 69 ...
+##  $ INS_SERIAL_NO            : chr  "109458" "109459" "109459" "109458" ...
+##  $ RCV_MODEM_ADDRESS        : logi  NA NA NA NA NA NA ...
+##  $ SYNC_DATE_TIME           : logi  NA NA NA NA NA NA ...
+##  $ MEMORY_ERASED_AT_DEPLOY  : logi  NA NA NA NA NA NA ...
+##  $ RCV_BATTERY_INSTALL_DATE : logi  NA NA NA NA NA NA ...
+##  $ RCV_EXPECTED_BATTERY_LIFE: logi  NA NA NA NA NA NA ...
+##  $ RCV_VOLTAGE_AT_DEPLOY    : logi  NA NA NA NA NA NA ...
+##  $ RCV_TILT_AFTER_DEPLOY    : logi  NA NA NA NA NA NA ...
+##  $ DEPLOYED_BY              : logi  NA NA NA NA NA NA ...
+##  $ COMMENTS                 : logi  NA NA NA NA NA NA ...
+##  $ GLATOS_SEASONAL          : chr  "YES" "YES" "YES" "YES" ...
+##  $ GLATOS_PROJECT           : chr  "HECWL" "HECWL" "HECWL" "HECWL" ...
+##  $ GLATOS_VPS               : chr  "NO" "NO" "NO" "NO" ...
+##  $ STATION                  : chr  "AGR-1" "AGR-1" "AGR-2" "AGR-2" ...
+##  - attr(*, ".internal.selfref")=&lt;externalptr&gt;
+```
+]
+]
+
+---
+
+# Prepare receiver recovery records
+
+.panelset[
+.panel[.panel-name[Load]
+
+
+```r
+# load example receiver deployments
+rec_recover &lt;- data.table::fread("ex_glatos_submission/HECWL_GLATOS_Recovery.csv")
+```
+]
+
+.panel[.panel-name[Peek]
+
+
+```
+## Classes 'data.table' and 'data.frame':	445 obs. of  17 variables:
+##  $ GLATOS_ARRAY            : chr  "AGR" "AGR" "AGR" "AGR" ...
+##  $ OTN_ARRAY               : logi  NA NA NA NA NA NA ...
+##  $ STATION_NO              : int  2 2 1 1 6 5 4 3 2 1 ...
+##  $ CONSECUTIVE_DEPLOY_NO   : int  1 2 1 2 1 1 1 1 1 2 ...
+##  $ OTN_MISSION_ID          : logi  NA NA NA NA NA NA ...
+##  $ AR_CONFIRM              : logi  NA NA NA NA NA NA ...
+##  $ DATA_DOWNLOADED         : logi  NA NA NA NA NA NA ...
+##  $ INS_MODEL_NUMBER        : logi  NA NA NA NA NA NA ...
+##  $ INS_SERIAL_NUMBER       : int  109459 109458 109458 109459 109881 109493 109985 109908 109492 109969 ...
+##  $ RECOVERED               : logi  NA NA NA NA NA NA ...
+##  $ RECOVER_DATE_TIME       : logi  NA NA NA NA NA NA ...
+##  $ GLATOS_RECOVER_DATE_TIME: chr  "2013-09-17 04:30" "2013-12-03 13:55" "2013-09-17 05:15" "2013-12-03 13:55" ...
+##  $ GLATOS_TIMEZONE         : chr  "Eastern" "Eastern" "Eastern" "Eastern" ...
+##  $ RECOVER_LAT             : logi  NA NA NA NA NA NA ...
+##  $ RECOVER_LONG            : logi  NA NA NA NA NA NA ...
+##  $ GLATOS_PROJECT          : chr  "HECWL" "HECWL" "HECWL" "HECWL" ...
+##  $ GLATOS_VPS              : chr  "NO" "NO" "NO" "NO" ...
+##  - attr(*, ".internal.selfref")=&lt;externalptr&gt;
+```
+]
+
+.panel[.panel-name[Process]
+
+
+```r
+# Need to calculate recover_date_time from GLATOS_recover_date_time and GLATOS_timezone
+rec_recover[, RECOVER_DATE_TIME := fast_strptime(GLATOS_RECOVER_DATE_TIME,
+                                             format = "%Y-%m-%d %H:%M",
+                                             tz = "America/Detroit", lt = FALSE)]
+
+rec_recover[, STATION := paste(GLATOS_ARRAY, STATION_NO, sep = "-")]
+
+rec_recover[, INS_SERIAL_NUMBER := as.character(INS_SERIAL_NUMBER)]
+```
+]
+
+.panel[.panel-name[Output]
+
+```
+## Classes 'data.table' and 'data.frame':	445 obs. of  18 variables:
+##  $ GLATOS_ARRAY            : chr  "AGR" "AGR" "AGR" "AGR" ...
+##  $ OTN_ARRAY               : logi  NA NA NA NA NA NA ...
+##  $ STATION_NO              : int  2 2 1 1 6 5 4 3 2 1 ...
+##  $ CONSECUTIVE_DEPLOY_NO   : int  1 2 1 2 1 1 1 1 1 2 ...
+##  $ OTN_MISSION_ID          : logi  NA NA NA NA NA NA ...
+##  $ AR_CONFIRM              : logi  NA NA NA NA NA NA ...
+##  $ DATA_DOWNLOADED         : logi  NA NA NA NA NA NA ...
+##  $ INS_MODEL_NUMBER        : logi  NA NA NA NA NA NA ...
+##  $ INS_SERIAL_NUMBER       : chr  "109459" "109458" "109458" "109459" ...
+##  $ RECOVERED               : logi  NA NA NA NA NA NA ...
+##  $ RECOVER_DATE_TIME       : POSIXct, format: "2013-09-17 04:30:00" "2013-12-03 13:55:00" "2013-09-17 05:15:00" "2013-12-03 13:55:00" ...
+##  $ GLATOS_RECOVER_DATE_TIME: chr  "2013-09-17 04:30" "2013-12-03 13:55" "2013-09-17 05:15" "2013-12-03 13:55" ...
+##  $ GLATOS_TIMEZONE         : chr  "Eastern" "Eastern" "Eastern" "Eastern" ...
+##  $ RECOVER_LAT             : logi  NA NA NA NA NA NA ...
+##  $ RECOVER_LONG            : logi  NA NA NA NA NA NA ...
+##  $ GLATOS_PROJECT          : chr  "HECWL" "HECWL" "HECWL" "HECWL" ...
+##  $ GLATOS_VPS              : chr  "NO" "NO" "NO" "NO" ...
+##  $ STATION                 : chr  "AGR-2" "AGR-2" "AGR-1" "AGR-1" ...
+##  - attr(*, ".internal.selfref")=&lt;externalptr&gt;
+```
+]
+]
+
+
+---
+
+# Join receiver deployments and recoveries
+
+.panelset[
+.panel[.panel-name[Code]
+
+
+```r
+# Use data.table left join to combine deployments and recoveries
+# Simplified 
+recs &lt;- rec_recover[rec_dep, .(GLATOS_ARRAY = i.GLATOS_ARRAY,
+                      STATION_NO = i.STATION_NO,
+                      CONSECUTIVE_DEPLOY_NO = i.CONSECUTIVE_DEPLOY_NO,
+                      DEPLOY_DATE_TIME = i.DEPLOY_DATE_TIME,
+                      DEPLOY_LAT = i.DEPLOY_LAT,
+                      DEPLOY_LONG = i.DEPLOY_LONG,
+                      INS_MODEL_NO = i.INS_MODEL_NO,
+                      INS_SERIAL_NO = i.INS_SERIAL_NO,
+                      STATION = i.STATION,
+                      RECOVER_DATE_TIME = x.RECOVER_DATE_TIME),
+                    on = .(GLATOS_ARRAY,
+                           STATION_NO,
+                           CONSECUTIVE_DEPLOY_NO,
+                           STATION,
+                           GLATOS_PROJECT,
+                           INS_SERIAL_NUMBER = INS_SERIAL_NO)]
+```
+]
+
+
+.panel[.panel-name[Table]
+
+
+```
+##      GLATOS_ARRAY STATION_NO CONSECUTIVE_DEPLOY_NO    DEPLOY_DATE_TIME DEPLOY_LAT DEPLOY_LONG INS_MODEL_NO INS_SERIAL_NO STATION   RECOVER_DATE_TIME
+##   1:          AGR          1                     1 2013-03-28 10:50:00   44.02625   -83.67835         VR2W        109458   AGR-1 2013-09-17 05:15:00
+##   2:          AGR          1                     2 2013-09-18 09:40:00   44.02622   -83.67832         VR2W        109459   AGR-1 2013-12-03 13:55:00
+##   3:          AGR          2                     1 2013-03-28 11:15:00   44.03336   -83.69031         VR2W        109459   AGR-2 2013-09-17 04:30:00
+##   4:          AGR          2                     2 2013-09-18 11:00:00   44.02809   -83.68158         VR2W        109458   AGR-2 2013-12-03 13:55:00
+##   5:          BBI          1                     2 2011-07-06 11:15:00   45.67471   -84.41954         VR2W        109969   BBI-1 2011-10-18 12:04:00
+##  ---                                                                                                                                                
+## 584:          TTB          2                     2 2011-07-20 10:30:00   43.39166   -83.99263         VR2W        109906   TTB-2 2011-09-13 08:47:00
+## 585:          TTB          2                     3 2012-03-14 12:50:00   43.39165   -83.99264         VR2W        113213   TTB-2 2012-07-17 13:04:00
+## 586:          TTB          2                     1 2011-03-29 13:21:00   43.39165   -83.99259         VR2W        110012   TTB-2 2011-07-20 10:26:00
+## 587:          TTB          2                     4 2012-07-17 13:15:00   43.39164   -83.99264         VR2W        109478   TTB-2                &lt;NA&gt;
+## 588:          TTB          2                     5 2013-07-24 03:32:00   43.39165   -83.99264         VR2W        106326   TTB-2                &lt;NA&gt;
+```
+]
+]
+
+---
+
+# GLATOS database
+
+&lt;center&gt;
+
+<div class="grViz html-widget html-fill-item-overflow-hidden html-fill-item" id="htmlwidget-2009b066f9abf9d99f87" style="width:504px;height:504px;"></div>
+<script type="application/json" data-for="htmlwidget-2009b066f9abf9d99f87">{"x":{"diagram":"digraph {\n\ngraph [layout = \"dot\",\n       outputorder = \"edgesfirst\",\n       bgcolor = \"#E9EBEE\",\n       concentrate = \"true\"]\n\nnode [fontname = \"Helvetica\",\n      fontsize = \"10\",\n      shape = \"circle\",\n      fixedsize = \"true\",\n      width = \"0.5\",\n      style = \"filled\",\n      fillcolor = \"aliceblue\",\n      color = \"gray70\",\n      fontcolor = \"gray50\"]\n\nedge [fontname = \"Helvetica\",\n     fontsize = \"8\",\n     len = \"1.5\",\n     color = \"gray80\",\n     arrowsize = \"0.5\"]\n\n  \"1\" [label = \"Project wkbk\", fixedsize = \"FALSE\", shape = \"rectangle\", fillcolor = \"#F0F8FF\", fontcolor = \"#000000\"] \n  \"2\" [label = \"Tagging\", fixedsize = \"FALSE\", shape = \"circle\", fillcolor = \"#F0F8FF\", fontcolor = \"#000000\"] \n  \"3\" [label = \"R. deployment\", fixedsize = \"FALSE\", shape = \"circle\", fillcolor = \"#F0F8FF\", fontcolor = \"#000000\"] \n  \"4\" [label = \"R. recovery\", fixedsize = \"FALSE\", shape = \"circle\", fillcolor = \"#F0F8FF\", fontcolor = \"#000000\"] \n  \"5\" [label = \"dbase\", fixedsize = \"FALSE\", shape = \"circle\", fillcolor = \"#F0F8FF\", fontcolor = \"#000000\"] \n  \"6\" [label = \"dtc\", fixedsize = \"FALSE\", shape = \"circle\", fillcolor = \"#F0F8FF\", fontcolor = \"#000000\"] \n  \"7\" [label = \"dtc export\", fixedsize = \"FALSE\", shape = \"circle\", fillcolor = \"#F0F8FF\", fontcolor = \"#000000\"] \n  \"1\"->\"2\" \n  \"1\"->\"3\" \n  \"1\"->\"4\" \n  \"2\"->\"5\" \n  \"3\"->\"5\" \n  \"4\"->\"5\" \n  \"6\"->\"5\" \n  \"5\"->\"7\" \n}","config":{"engine":"dot","options":null}},"evals":[],"jsHooks":[]}</script>
+&lt;/center&gt;
+
+---
+
+
+
+# Tagging 
+- No required columns for `glatos` package functions
+
+.panelset[
+.panel[.panel-name[Load]
+
+
+```r
+# load example tagging data
+tag &lt;- fread("ex_glatos_submission/HECWL_GLATOS_Tagging.csv")
+```
+]
+
+.panel[.panel-name[Peek]
+
+```
+## Classes 'data.table' and 'data.frame':	542 obs. of  57 variables:
+##  $ ANIMAL_ID                                : int  543 536 453 479 1 2 3 4 5 6 ...
+##  $ TAG_TYPE                                 : logi  NA NA NA NA NA NA ...
+##  $ TAG_MANUFACTURER                         : logi  NA NA NA NA NA NA ...
+##  $ TAG_MODEL                                : logi  NA NA NA NA NA NA ...
+##  $ TAG_SERIAL_NUMBER                        : logi  NA NA NA NA NA NA ...
+##  $ TAG_ID_CODE                              : int  32011 32313 32319 32571 15136 15157 15181 15197 15214 15249 ...
+##  $ TAG_CODE_SPACE                           : chr  "A69-9001" "A69-9001" "A69-9001" "A69-9001" ...
+##  $ TAG_IMPLANT_TYPE                         : logi  NA NA NA NA NA NA ...
+##  $ TAG_ACTIVATION_DATE                      : logi  NA NA NA NA NA NA ...
+##  $ EST_TAG_LIFE                             : logi  NA NA NA NA NA NA ...
+##  $ TAGGER                                   : logi  NA NA NA NA NA NA ...
+##  $ TAG_OWNER_PI                             : logi  NA NA NA NA NA NA ...
+##  $ TAG_OWNER_ORGANIZATION                   : logi  NA NA NA NA NA NA ...
+##  $ COMMON_NAME_E                            : chr  "walleye" "walleye" "walleye" "walleye" ...
+##  $ SCIENTIFIC_NAME                          : chr  "Sander vitreus" "Sander vitreus" "Sander vitreus" "Sander vitreus" ...
+##  $ CAPTURE_LOCATION                         : logi  NA NA NA NA NA NA ...
+##  $ CAPTURE_LATITUDE                         : logi  NA NA NA NA NA NA ...
+##  $ CAPTURE_LONGITUDE                        : logi  NA NA NA NA NA NA ...
+##  $ WILD_OR_HATCHERY                         : logi  NA NA NA NA NA NA ...
+##  $ STOCK                                    : logi  NA NA NA NA NA NA ...
+##  $ LENGTH                                   : logi  NA NA NA NA NA NA ...
+##  $ WEIGHT                                   : logi  NA NA NA NA NA NA ...
+##  $ LENGTH_TYPE                              : logi  NA NA NA NA NA NA ...
+##  $ AGE                                      : logi  NA NA NA NA NA NA ...
+##  $ SEX                                      : logi  NA NA NA NA NA NA ...
+##  $ DNA_SAMPLE_TAKEN                         : logi  NA NA NA NA NA NA ...
+##  $ TREATMENT_TYPE                           : logi  NA NA NA NA NA NA ...
+##  $ RELEASE_GROUP                            : logi  NA NA NA NA NA NA ...
+##  $ RELEASE_LOCATION                         : chr  "AuGres" "AuGres" "Tittabawassee" "Tittabawassee" ...
+##  $ RELEASE_LATITUDE                         : logi  NA NA NA NA NA NA ...
+##  $ RELEASE_LONGITUDE                        : logi  NA NA NA NA NA NA ...
+##  $ UTC_RELEASE_DATE_TIME                    : logi  NA NA NA NA NA NA ...
+##  $ GLATOS_RELEASE_DATE_TIME                 : chr  "2013-04-08 16:00" "2013-04-08 16:00" "2011-04-05 14:26" "2012-03-20 16:00" ...
+##  $ GLATOS_TIMEZONE                          : chr  "Eastern" "Eastern" "Eastern" "Eastern" ...
+##  $ CAPTURE_DEPTH                            : logi  NA NA NA NA NA NA ...
+##  $ TEMPERATURE_CHANGE                       : logi  NA NA NA NA NA NA ...
+##  $ HOLDING_TEMPERATURE                      : logi  NA NA NA NA NA NA ...
+##  $ SURGERY_LOCATION                         : logi  NA NA NA NA NA NA ...
+##  $ DATE_OF_SURGERY                          : logi  NA NA NA NA NA NA ...
+##  $ SURGERY_LATITUDE                         : logi  NA NA NA NA NA NA ...
+##  $ SURGERY_LONGITUDE                        : logi  NA NA NA NA NA NA ...
+##  $ SEDATIVE                                 : logi  NA NA NA NA NA NA ...
+##  $ SEDATIVE_CONCENTRATION                   : logi  NA NA NA NA NA NA ...
+##  $ ANAESTHETIC                              : logi  NA NA NA NA NA NA ...
+##  $ BUFFER                                   : logi  NA NA NA NA NA NA ...
+##  $ ANAESTHETIC_CONCENTRATION                : logi  NA NA NA NA NA NA ...
+##  $ BUFFER_CONCENTRATION_IN_ANAESTHETIC      : logi  NA NA NA NA NA NA ...
+##  $ ANESTHETIC_CONCENTRATION_IN_RECIRCULATION: logi  NA NA NA NA NA NA ...
+##  $ BUFFER_CONCENTRATION_IN_RECIRCULATION    : logi  NA NA NA NA NA NA ...
+##  $ DISSOLVED_OXYGEN                         : logi  NA NA NA NA NA NA ...
+##  $ COMMENTS                                 : logi  NA NA NA NA NA NA ...
+##  $ GLATOS_PROJECT                           : chr  "HECWL" "HECWL" "HECWL" "HECWL" ...
+##  $ GLATOS_EXTERNAL_TAG_ID1                  : logi  NA NA NA NA NA NA ...
+##  $ GLATOS_EXTERNAL_TAG_ID2                  : logi  NA NA NA NA NA NA ...
+##  $ GLATOS_TAG_RECOVERED                     : chr  "NO" "NO" "NO" "NO" ...
+##  $ GLATOS_CAUGHT_DATE                       : IDate, format: NA NA NA NA ...
+##  $ GLATOS_REWARD                            : logi  NA NA NA NA NA NA ...
+##  - attr(*, ".internal.selfref")=&lt;externalptr&gt;
+```
+]
+
+.panel[.panel-name[Process]
+
+
+```r
+# lots of columns, simplify for example
+tag &lt;- tag[, c("ANIMAL_ID", "TAG_ID_CODE", "TAG_CODE_SPACE", "COMMON_NAME_E", "SCIENTIFIC_NAME", "GLATOS_RELEASE_DATE_TIME",
+               "GLATOS_PROJECT", "GLATOS_CAUGHT_DATE")]
+
+# convert animal_id to character
+tag[, ANIMAL_ID := as.character(ANIMAL_ID)]
+
+# add release date time as POSIXct
+tag[, RELEASE_DATE_TIME := as.POSIXct(GLATOS_RELEASE_DATE_TIME, tz = "America/Detroit")]
+
+# Convert caught date to Date class
+tag[, GLATOS_recap_date := as.POSIXct(as.Date(GLATOS_CAUGHT_DATE), tz = "UTC")]
+
+# convert TAG_ID_CODE to character
+tag[, TAG_ID_CODE := as.character(TAG_ID_CODE)]
+```
+]
+
+.panel[.panel-name[Output]
+
+
+```
+## Classes 'data.table' and 'data.frame':	542 obs. of  10 variables:
+##  $ ANIMAL_ID               : chr  "543" "536" "453" "479" ...
+##  $ TAG_ID_CODE             : chr  "32011" "32313" "32319" "32571" ...
+##  $ TAG_CODE_SPACE          : chr  "A69-9001" "A69-9001" "A69-9001" "A69-9001" ...
+##  $ COMMON_NAME_E           : chr  "walleye" "walleye" "walleye" "walleye" ...
+##  $ SCIENTIFIC_NAME         : chr  "Sander vitreus" "Sander vitreus" "Sander vitreus" "Sander vitreus" ...
+##  $ GLATOS_RELEASE_DATE_TIME: chr  "2013-04-08 16:00" "2013-04-08 16:00" "2011-04-05 14:26" "2012-03-20 16:00" ...
+##  $ GLATOS_PROJECT          : chr  "HECWL" "HECWL" "HECWL" "HECWL" ...
+##  $ GLATOS_CAUGHT_DATE      : IDate, format: NA NA NA NA ...
+##  $ RELEASE_DATE_TIME       : POSIXct, format: "2013-04-08 16:00:00" "2013-04-08 16:00:00" "2011-04-05 14:26:00" "2012-03-20 16:00:00" ...
+##  $ GLATOS_recap_date       : POSIXct, format: NA NA NA NA ...
+##  - attr(*, ".internal.selfref")=&lt;externalptr&gt;
+```
+]
+]
+
+---
+
+
+# GLATOS database
+
+&lt;center&gt;
+
+<div class="grViz html-widget html-fill-item-overflow-hidden html-fill-item" id="htmlwidget-cb229942783900892524" style="width:504px;height:504px;"></div>
+<script type="application/json" data-for="htmlwidget-cb229942783900892524">{"x":{"diagram":"digraph {\n\ngraph [layout = \"dot\",\n       outputorder = \"edgesfirst\",\n       bgcolor = \"#E9EBEE\",\n       concentrate = \"true\"]\n\nnode [fontname = \"Helvetica\",\n      fontsize = \"10\",\n      shape = \"circle\",\n      fixedsize = \"true\",\n      width = \"0.5\",\n      style = \"filled\",\n      fillcolor = \"aliceblue\",\n      color = \"gray70\",\n      fontcolor = \"gray50\"]\n\nedge [fontname = \"Helvetica\",\n     fontsize = \"8\",\n     len = \"1.5\",\n     color = \"gray80\",\n     arrowsize = \"0.5\"]\n\n  \"1\" [label = \"Project wkbk\", fixedsize = \"FALSE\", shape = \"rectangle\", fillcolor = \"#F0F8FF\", fontcolor = \"#000000\"] \n  \"2\" [label = \"Tagging\", fixedsize = \"FALSE\", shape = \"circle\", fillcolor = \"#F0F8FF\", fontcolor = \"#000000\"] \n  \"3\" [label = \"R. deployment\", fixedsize = \"FALSE\", shape = \"circle\", fillcolor = \"#F0F8FF\", fontcolor = \"#000000\"] \n  \"4\" [label = \"R. recovery\", fixedsize = \"FALSE\", shape = \"circle\", fillcolor = \"#F0F8FF\", fontcolor = \"#000000\"] \n  \"5\" [label = \"dbase\", fixedsize = \"FALSE\", shape = \"circle\", fillcolor = \"#F0F8FF\", fontcolor = \"#000000\"] \n  \"6\" [label = \"dtc\", fixedsize = \"FALSE\", shape = \"circle\", fillcolor = \"#F0F8FF\", fontcolor = \"#000000\"] \n  \"7\" [label = \"dtc export\", fixedsize = \"FALSE\", shape = \"circle\", fillcolor = \"#F0F8FF\", fontcolor = \"#000000\"] \n  \"1\"->\"2\" \n  \"1\"->\"3\" \n  \"1\"->\"4\" \n  \"2\"->\"5\" \n  \"3\"->\"5\" \n  \"4\"->\"5\" \n  \"6\"->\"5\" \n  \"5\"->\"7\" \n}","config":{"engine":"dot","options":null}},"evals":[],"jsHooks":[]}</script>
+&lt;/center&gt;
+
+---
+
+# Detection data
+
+.pull-left[
+## Required columns
+- Detection_timestamp_utc (POSIXct)
+- receiver_sn (character)
+- deploy_lat (numeric)
+- deploy_long (numeric)
+- transmitter_codespace (character)
+- transmitter_id (character)
+- sensor_value (numeric)
+- sensor_unit (character)
+- animal_id (character)
+]
+
+.pull-right[
+## Optional columns
+- glatos_array (character)
+- station (character)
+- glatos_project_receiver (character)
+]
+
+---
+
+# Detection data
+- Export detections from *.vrl files from Innovasea VUE software (*.csv)
+- Not going to step through the process for exporting detections from VUE database
+
+VUE operators manual
+https://go.innovasea.com/vue_manual.pdf
+
+.center[
+&lt;img src="images/VUE_screenshot.png" width="700px"/&gt;
+]
+
+---
+# Detection data
+
+.panelset[
+.panel[.panel-name[Load]
+
+
+```r
+# load detection file from VUE
+dtc &lt;- fread("ex_glatos_submission/EX_IOWA_export.csv", sep=",", header=TRUE, fill=TRUE)
+```
+]
+
+.panel[.panel-name[Peek]
+
+
+```
+## Classes 'data.table' and 'data.frame':	500000 obs. of  12 variables:
+##  $ Date and Time (UTC): POSIXct, format: "2012-11-28 23:44:45" "2013-06-19 22:22:16" "2012-11-26 22:23:46" "2013-07-12 02:35:37" ...
+##  $ Receiver           : chr  "VR2W-109885" "VR2W-109991" "VR2W-114482" "VR2W-120593" ...
+##  $ Transmitter        : chr  "A69-1601-29500" "A69-9001-32059" "A69-9001-32276" "A69-1601-29498" ...
+##  $ Transmitter Name   : logi  NA NA NA NA NA NA ...
+##  $ Transmitter Serial : logi  NA NA NA NA NA NA ...
+##  $ Sensor Value       : int  NA NA NA NA NA NA NA NA NA NA ...
+##  $ Sensor Unit        : chr  "" "" "" "" ...
+##  $ Station Name       : logi  NA NA NA NA NA NA ...
+##  $ Latitude           : logi  NA NA NA NA NA NA ...
+##  $ Longitude          : logi  NA NA NA NA NA NA ...
+##  $ Transmitter Type   : logi  NA NA NA NA NA NA ...
+##  $ Sensor Precision   : logi  NA NA NA NA NA NA ...
+##  - attr(*, ".internal.selfref")=&lt;externalptr&gt;
+```
+]
+
+.panel[.panel-name[Process]
+
+
+```r
+# change column name "date and time" to "detection_timestamp_utc"
+setnames(dtc, c("Date and Time (UTC)"), c("detection_timestamp_utc"))
+
+# make new column "receiver_sn" from "Receiver"
+dtc[, receiver_sn := strsplit(Receiver, "-")[[1]][2], by = "Receiver"]
+
+# extract transmitter_codespace and transmitter_id from "Transmitter" column
+# step 1- create function to extract id from Transmitter
+parse_tid &lt;- function(x){strsplit(x, "-")[[1]][3]}
+
+# stetp 2- create function to extract codespace from Transmitter
+parse_tcs &lt;- function(x){
+  #split on "-" and keep first two extracted elements
+  tx &lt;- strsplit(x, "-")[[1]][1:2]
+  return(paste(tx[1:2], collapse="-"))
+}
+
+dtc[, `:=`(transmitter_codespace=parse_tcs(Transmitter),
+           transmitter_id=parse_tid(Transmitter)),
+    by="Transmitter"]
+
+# change names for "sensor value" and "sensor unit"
+setnames(dtc, c("Sensor Value", "Sensor Unit"), c("sensor_value", "sensor_unit"))
+```
+]
+
+.panel[.panel-name[Table]
+
+
+```
+## Classes 'data.table' and 'data.frame':	500000 obs. of  15 variables:
+##  $ detection_timestamp_utc: POSIXct, format: "2012-11-28 23:44:45" "2013-06-19 22:22:16" "2012-11-26 22:23:46" "2013-07-12 02:35:37" ...
+##  $ Receiver               : chr  "VR2W-109885" "VR2W-109991" "VR2W-114482" "VR2W-120593" ...
+##  $ Transmitter            : chr  "A69-1601-29500" "A69-9001-32059" "A69-9001-32276" "A69-1601-29498" ...
+##  $ Transmitter Name       : logi  NA NA NA NA NA NA ...
+##  $ Transmitter Serial     : logi  NA NA NA NA NA NA ...
+##  $ sensor_value           : int  NA NA NA NA NA NA NA NA NA NA ...
+##  $ sensor_unit            : chr  "" "" "" "" ...
+##  $ Station Name           : logi  NA NA NA NA NA NA ...
+##  $ Latitude               : logi  NA NA NA NA NA NA ...
+##  $ Longitude              : logi  NA NA NA NA NA NA ...
+##  $ Transmitter Type       : logi  NA NA NA NA NA NA ...
+##  $ Sensor Precision       : logi  NA NA NA NA NA NA ...
+##  $ receiver_sn            : chr  "109885" "109991" "114482" "120593" ...
+##  $ transmitter_codespace  : chr  "A69-1601" "A69-9001" "A69-9001" "A69-1601" ...
+##  $ transmitter_id         : chr  "29500" "32059" "32276" "29498" ...
+##  - attr(*, ".internal.selfref")=&lt;externalptr&gt;
+```
+]
+]
+
+---
+
+# GLATOS database
+
+&lt;center&gt;
+
+<div class="grViz html-widget html-fill-item-overflow-hidden html-fill-item" id="htmlwidget-3d112a7dfb0094f25b13" style="width:504px;height:504px;"></div>
+<script type="application/json" data-for="htmlwidget-3d112a7dfb0094f25b13">{"x":{"diagram":"digraph {\n\ngraph [layout = \"dot\",\n       outputorder = \"edgesfirst\",\n       bgcolor = \"#E9EBEE\",\n       concentrate = \"true\"]\n\nnode [fontname = \"Helvetica\",\n      fontsize = \"10\",\n      shape = \"circle\",\n      fixedsize = \"true\",\n      width = \"0.5\",\n      style = \"filled\",\n      fillcolor = \"aliceblue\",\n      color = \"gray70\",\n      fontcolor = \"gray50\"]\n\nedge [fontname = \"Helvetica\",\n     fontsize = \"8\",\n     len = \"1.5\",\n     color = \"gray80\",\n     arrowsize = \"0.5\"]\n\n  \"1\" [label = \"Project wkbk\", fixedsize = \"FALSE\", shape = \"rectangle\", fillcolor = \"#F0F8FF\", fontcolor = \"#000000\"] \n  \"2\" [label = \"Tagging\", fixedsize = \"FALSE\", shape = \"circle\", fillcolor = \"#F0F8FF\", fontcolor = \"#000000\"] \n  \"3\" [label = \"R. deployment\", fixedsize = \"FALSE\", shape = \"circle\", fillcolor = \"#F0F8FF\", fontcolor = \"#000000\"] \n  \"4\" [label = \"R. recovery\", fixedsize = \"FALSE\", shape = \"circle\", fillcolor = \"#F0F8FF\", fontcolor = \"#000000\"] \n  \"5\" [label = \"dbase\", fixedsize = \"FALSE\", shape = \"circle\", fillcolor = \"#F0F8FF\", fontcolor = \"#000000\"] \n  \"6\" [label = \"dtc\", fixedsize = \"FALSE\", shape = \"circle\", fillcolor = \"#F0F8FF\", fontcolor = \"#000000\"] \n  \"7\" [label = \"dtc export\", fixedsize = \"FALSE\", shape = \"circle\", fillcolor = \"#F0F8FF\", fontcolor = \"#000000\"] \n  \"1\"->\"2\" \n  \"1\"->\"3\" \n  \"1\"->\"4\" \n  \"2\"->\"5\" \n  \"3\"->\"5\" \n  \"4\"->\"5\" \n  \"6\"->\"5\" \n  \"5\"->\"7\" \n}","config":{"engine":"dot","options":null}},"evals":[],"jsHooks":[]}</script>
+&lt;/center&gt;
+
+---
+
+# Add 'animal_id' to detections
+
+- "ANIMAL_ID" ("tagging" data)
+- Left join, constrained by tag ID code, tag release date/time, and tag recover date/time
+
+## why?
+
+- Account for multiple deployments of tag 
+   - fish is caught, tag recovered, and redeployed
+- Output includes only detections after fish release and before recapture
+- Subset columns in output
+- ANIMAL_ID is required column
+
+---
+
+# Add 'animal_id' to detections
+
+.panelset[
+.panel[.panel-name[Tagging]
+
+```
+## Classes 'data.table' and 'data.frame':	542 obs. of  10 variables:
+##  $ ANIMAL_ID               : chr  "543" "536" "453" "479" ...
+##  $ TAG_ID_CODE             : chr  "32011" "32313" "32319" "32571" ...
+##  $ TAG_CODE_SPACE          : chr  "A69-9001" "A69-9001" "A69-9001" "A69-9001" ...
+##  $ COMMON_NAME_E           : chr  "walleye" "walleye" "walleye" "walleye" ...
+##  $ SCIENTIFIC_NAME         : chr  "Sander vitreus" "Sander vitreus" "Sander vitreus" "Sander vitreus" ...
+##  $ GLATOS_RELEASE_DATE_TIME: chr  "2013-04-08 16:00" "2013-04-08 16:00" "2011-04-05 14:26" "2012-03-20 16:00" ...
+##  $ GLATOS_PROJECT          : chr  "HECWL" "HECWL" "HECWL" "HECWL" ...
+##  $ GLATOS_CAUGHT_DATE      : IDate, format: NA NA NA NA ...
+##  $ RELEASE_DATE_TIME       : POSIXct, format: "2013-04-08 16:00:00" "2013-04-08 16:00:00" "2011-04-05 14:26:00" "2012-03-20 16:00:00" ...
+##  $ GLATOS_recap_date       : POSIXct, format: NA NA NA NA ...
+##  - attr(*, ".internal.selfref")=&lt;externalptr&gt;
+```
+]
+
+.panel[.panel-name[Detections]
+
+```
+## Classes 'data.table' and 'data.frame':	500000 obs. of  15 variables:
+##  $ detection_timestamp_utc: POSIXct, format: "2012-11-28 23:44:45" "2013-06-19 22:22:16" "2012-11-26 22:23:46" "2013-07-12 02:35:37" ...
+##  $ Receiver               : chr  "VR2W-109885" "VR2W-109991" "VR2W-114482" "VR2W-120593" ...
+##  $ Transmitter            : chr  "A69-1601-29500" "A69-9001-32059" "A69-9001-32276" "A69-1601-29498" ...
+##  $ Transmitter Name       : logi  NA NA NA NA NA NA ...
+##  $ Transmitter Serial     : logi  NA NA NA NA NA NA ...
+##  $ sensor_value           : int  NA NA NA NA NA NA NA NA NA NA ...
+##  $ sensor_unit            : chr  "" "" "" "" ...
+##  $ Station Name           : logi  NA NA NA NA NA NA ...
+##  $ Latitude               : logi  NA NA NA NA NA NA ...
+##  $ Longitude              : logi  NA NA NA NA NA NA ...
+##  $ Transmitter Type       : logi  NA NA NA NA NA NA ...
+##  $ Sensor Precision       : logi  NA NA NA NA NA NA ...
+##  $ receiver_sn            : chr  "109885" "109991" "114482" "120593" ...
+##  $ transmitter_codespace  : chr  "A69-1601" "A69-9001" "A69-9001" "A69-1601" ...
+##  $ transmitter_id         : chr  "29500" "32059" "32276" "29498" ...
+##  - attr(*, ".internal.selfref")=&lt;externalptr&gt;
+```
+]
+
+.panel[.panel-name[Join data]
+
+```r
+# join animal_id to detections with data.table non-equi join
+dtc &lt;- tag[dtc, .(ANIMAL_ID,
+                  detection_timestamp_utc,
+                  Receiver,
+                  Transmitter,
+                  sensor_value,
+                  sensor_unit,
+                  receiver_sn,
+                  transmitter_codespace,
+                  transmitter_id),
+           on = .(TAG_ID_CODE = transmitter_id,
+                  TAG_CODE_SPACE = transmitter_codespace,
+                  RELEASE_DATE_TIME &lt;= detection_timestamp_utc,
+                  GLATOS_recap_date &gt;= detection_timestamp_utc),
+           nomatch = NULL]
+```
+]
+
+.panel[.panel-name[Output]
+
+```
+##        ANIMAL_ID detection_timestamp_utc    Receiver    Transmitter sensor_value sensor_unit receiver_sn transmitter_codespace transmitter_id
+##     1:       485     2013-05-29 16:57:12 VR2W-109917 A69-9001-32650           NA                  109917              A69-9001          32650
+##     2:       485     2012-06-25 02:44:42 VR2W-109917 A69-9001-32650           NA                  109917              A69-9001          32650
+##     3:       485     2013-06-17 18:26:28 VR2W-109938 A69-9001-32650           NA                  109938              A69-9001          32650
+##     4:       263     2012-09-30 23:01:19 VR2W-112965 A69-9001-32145           NA                  112965              A69-9001          32145
+##     5:       263     2012-07-26 21:48:33 VR2W-112959 A69-9001-32145           NA                  112959              A69-9001          32145
+##    ---                                                                                                                                       
+## 99976:       485     2013-05-27 14:15:34 VR2W-109938 A69-9001-32650           NA                  109938              A69-9001          32650
+## 99977:       485     2012-07-01 00:26:22 VR2W-109917 A69-9001-32650           NA                  109917              A69-9001          32650
+## 99978:       136     2012-06-16 12:57:59 VR2W-109422 A69-9001-32039           NA                  109422              A69-9001          32039
+## 99979:       252     2012-11-25 00:45:51 VR2W-109422 A69-9001-32136           NA                  109422              A69-9001          32136
+## 99980:       177     2012-09-06 21:47:32 VR2W-109125 A69-9001-32073           NA                  109125              A69-9001          32073
+```
+]
+]
+
+---
+
+
+# GLATOS database
+
+&lt;center&gt;
+
+<div class="grViz html-widget html-fill-item-overflow-hidden html-fill-item" id="htmlwidget-0393e61139945f883b2d" style="width:504px;height:504px;"></div>
+<script type="application/json" data-for="htmlwidget-0393e61139945f883b2d">{"x":{"diagram":"digraph {\n\ngraph [layout = \"dot\",\n       outputorder = \"edgesfirst\",\n       bgcolor = \"#E9EBEE\",\n       concentrate = \"true\"]\n\nnode [fontname = \"Helvetica\",\n      fontsize = \"10\",\n      shape = \"circle\",\n      fixedsize = \"true\",\n      width = \"0.5\",\n      style = \"filled\",\n      fillcolor = \"aliceblue\",\n      color = \"gray70\",\n      fontcolor = \"gray50\"]\n\nedge [fontname = \"Helvetica\",\n     fontsize = \"8\",\n     len = \"1.5\",\n     color = \"gray80\",\n     arrowsize = \"0.5\"]\n\n  \"1\" [label = \"Project wkbk\", fixedsize = \"FALSE\", shape = \"rectangle\", fillcolor = \"#F0F8FF\", fontcolor = \"#000000\"] \n  \"2\" [label = \"Tagging\", fixedsize = \"FALSE\", shape = \"circle\", fillcolor = \"#F0F8FF\", fontcolor = \"#000000\"] \n  \"3\" [label = \"R. deployment\", fixedsize = \"FALSE\", shape = \"circle\", fillcolor = \"#F0F8FF\", fontcolor = \"#000000\"] \n  \"4\" [label = \"R. recovery\", fixedsize = \"FALSE\", shape = \"circle\", fillcolor = \"#F0F8FF\", fontcolor = \"#000000\"] \n  \"5\" [label = \"dbase\", fixedsize = \"FALSE\", shape = \"circle\", fillcolor = \"#F0F8FF\", fontcolor = \"#000000\"] \n  \"6\" [label = \"dtc\", fixedsize = \"FALSE\", shape = \"circle\", fillcolor = \"#F0F8FF\", fontcolor = \"#000000\"] \n  \"7\" [label = \"dtc export\", fixedsize = \"FALSE\", shape = \"circle\", fillcolor = \"#F0F8FF\", fontcolor = \"#000000\"] \n  \"1\"->\"2\" \n  \"1\"->\"3\" \n  \"1\"->\"4\" \n  \"2\"->\"5\" \n  \"3\"->\"5\" \n  \"4\"->\"5\" \n  \"6\"->\"5\" \n  \"5\"->\"7\" \n}","config":{"engine":"dot","options":null}},"evals":[],"jsHooks":[]}</script>
+&lt;/center&gt;
+
+---
+
+
+# Add receiver latitude and longitude to each detection
+
+- Receiver latitude and longitude info is in "recs" object
+- Need to remove detections that happened prior to receiver deployment or after receiver deployment
+- Required columns
+---
+
+# Add receiver latitude and longitude to each detection
+
+.panelset[
+.panel[.panel-name[Receivers]
+
+```
+## Classes 'data.table' and 'data.frame':	588 obs. of  10 variables:
+##  $ GLATOS_ARRAY         : chr  "AGR" "AGR" "AGR" "AGR" ...
+##  $ STATION_NO           : int  1 1 2 2 1 1 1 2 2 3 ...
+##  $ CONSECUTIVE_DEPLOY_NO: int  1 2 1 2 2 3 1 1 2 1 ...
+##  $ DEPLOY_DATE_TIME     : POSIXct, format: "2013-03-28 10:50:00" "2013-09-18 09:40:00" "2013-03-28 11:15:00" "2013-09-18 11:00:00" ...
+##  $ DEPLOY_LAT           : num  44 44 44 44 45.7 ...
+##  $ DEPLOY_LONG          : num  -83.7 -83.7 -83.7 -83.7 -84.4 ...
+##  $ INS_MODEL_NO         : chr  "VR2W" "VR2W" "VR2W" "VR2W" ...
+##  $ INS_SERIAL_NO        : chr  "109458" "109459" "109459" "109458" ...
+##  $ STATION              : chr  "AGR-1" "AGR-1" "AGR-2" "AGR-2" ...
+##  $ RECOVER_DATE_TIME    : POSIXct, format: "2013-09-17 05:15:00" "2013-12-03 13:55:00" "2013-09-17 04:30:00" "2013-12-03 13:55:00" ...
+##  - attr(*, ".internal.selfref")=&lt;externalptr&gt;
+```
+]
+
+.panel[.panel-name[Detections]
+
+```
+## Classes 'data.table' and 'data.frame':	99980 obs. of  9 variables:
+##  $ ANIMAL_ID              : chr  "485" "485" "485" "263" ...
+##  $ detection_timestamp_utc: POSIXct, format: "2013-05-29 16:57:12" "2012-06-25 02:44:42" "2013-06-17 18:26:28" "2012-09-30 23:01:19" ...
+##  $ Receiver               : chr  "VR2W-109917" "VR2W-109917" "VR2W-109938" "VR2W-112965" ...
+##  $ Transmitter            : chr  "A69-9001-32650" "A69-9001-32650" "A69-9001-32650" "A69-9001-32145" ...
+##  $ sensor_value           : int  NA NA NA NA NA NA NA NA NA NA ...
+##  $ sensor_unit            : chr  "" "" "" "" ...
+##  $ receiver_sn            : chr  "109917" "109917" "109938" "112965" ...
+##  $ transmitter_codespace  : chr  "A69-9001" "A69-9001" "A69-9001" "A69-9001" ...
+##  $ transmitter_id         : chr  "32650" "32650" "32650" "32145" ...
+##  - attr(*, ".internal.selfref")=&lt;externalptr&gt;
+```
+]
+
+.panel[.panel-name[Join data]
+
+
+```r
+# add receiver deployment lat/lon
+dtc &lt;- recs[dtc, .(ANIMAL_ID,
+                   detection_timestamp_utc,
+                   Receiver,
+                   Transmitter,
+                   sensor_value,
+                   sensor_unit,
+                   receiver_sn,
+                   transmitter_codespace,
+                   transmitter_id,
+                   DEPLOY_LAT,
+                   DEPLOY_LONG),
+            on = .(INS_SERIAL_NO = receiver_sn,
+                   DEPLOY_DATE_TIME &lt;= detection_timestamp_utc,
+                   RECOVER_DATE_TIME &gt;= detection_timestamp_utc),
+            nomatch = NULL]
+```
+]
+
+
+.panel[.panel-name[Output]
+
+```
+##     ANIMAL_ID detection_timestamp_utc    Receiver    Transmitter sensor_value sensor_unit receiver_sn transmitter_codespace transmitter_id DEPLOY_LAT DEPLOY_LONG
+##  1:       485     2013-05-29 16:57:12 VR2W-109917 A69-9001-32650           NA                  109917              A69-9001          32650   44.19002   -83.31774
+##  2:       485     2012-06-25 02:44:42 VR2W-109917 A69-9001-32650           NA                  109917              A69-9001          32650   44.19002   -83.31774
+##  3:       485     2013-06-17 18:26:28 VR2W-109938 A69-9001-32650           NA                  109938              A69-9001          32650   44.18527   -83.30745
+##  4:       263     2012-09-30 23:01:19 VR2W-112965 A69-9001-32145           NA                  112965              A69-9001          32145   44.03231   -83.29613
+##  5:       263     2012-07-26 21:48:33 VR2W-112959 A69-9001-32145           NA                  112959              A69-9001          32145   44.00993   -83.27495
+##  6:       449     2012-08-13 04:43:01 VR2W-109460 A69-9001-32315           NA                  109460              A69-9001          32315   44.95714   -83.29516
+##  7:       240     2012-06-11 19:53:10 VR2W-110008 A69-9001-32127           NA                  110008              A69-9001          32127   44.22771   -83.40310
+##  8:       485     2013-05-05 11:26:41 VR2W-119324 A69-9001-32650           NA                  119324              A69-9001          32650   44.19472   -83.32868
+##  9:       252     2012-12-18 18:51:07 VR2W-109422 A69-9001-32136           NA                  109422              A69-9001          32136   44.00234   -83.26799
+## 10:       146     2013-05-30 20:45:53 VR2W-119330 A69-9001-32047           NA                  119330              A69-9001          32047   44.21828   -83.38175
+```
+]
+]
+
+---
+
+# Thanks!
+
+For help, contact:
+
+Todd Hayden
+thayden@usgs.gov
+
+
+`glatos` website:
+
+https://github.com/ocean-tracking-network/glatos
+
+Github repository of presentation:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    </textarea>
+<style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
+<script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
+<script>var slideshow = remark.create({
+"ratio": "16:9",
+"highlightStyle": "googlecode",
+"highlightLines": true,
+"highlighLanguage": "r"
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function(d) {
+  var s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})(document);
+
+(function(d) {
+  var el = d.getElementsByClassName("remark-slides-area");
+  if (!el) return;
+  var slide, slides = slideshow.getSlides(), els = el[0].children;
+  for (var i = 1; i < slides.length; i++) {
+    slide = slides[i];
+    if (slide.properties.continued === "true" || slide.properties.count === "false") {
+      els[i - 1].className += ' has-continuation';
+    }
+  }
+  var s = d.createElement("style");
+  s.type = "text/css"; s.innerHTML = "@media print { .has-continuation { display: none; } }";
+  d.head.appendChild(s);
+})(document);
+// delete the temporary CSS (for displaying all slides initially) when the user
+// starts to view slides
+(function() {
+  var deleted = false;
+  slideshow.on('beforeShowSlide', function(slide) {
+    if (deleted) return;
+    var sheets = document.styleSheets, node;
+    for (var i = 0; i < sheets.length; i++) {
+      node = sheets[i].ownerNode;
+      if (node.dataset["target"] !== "print-only") continue;
+      node.parentNode.removeChild(node);
+    }
+    deleted = true;
+  });
+})();
+// add `data-at-shortcutkeys` attribute to <body> to resolve conflicts with JAWS
+// screen reader (see PR #262)
+(function(d) {
+  let res = {};
+  d.querySelectorAll('.remark-help-content table tr').forEach(tr => {
+    const t = tr.querySelector('td:nth-child(2)').innerText;
+    tr.querySelectorAll('td:first-child .key').forEach(key => {
+      const k = key.innerText;
+      if (/^[a-z]$/.test(k)) res[k] = t;  // must be a single letter (key)
+    });
+  });
+  d.body.setAttribute('data-at-shortcutkeys', JSON.stringify(res));
+})(document);
+(function() {
+  "use strict"
+  // Replace <script> tags in slides area to make them executable
+  var scripts = document.querySelectorAll(
+    '.remark-slides-area .remark-slide-container script'
+  );
+  if (!scripts.length) return;
+  for (var i = 0; i < scripts.length; i++) {
+    var s = document.createElement('script');
+    var code = document.createTextNode(scripts[i].textContent);
+    s.appendChild(code);
+    var scriptAttrs = scripts[i].attributes;
+    for (var j = 0; j < scriptAttrs.length; j++) {
+      s.setAttribute(scriptAttrs[j].name, scriptAttrs[j].value);
+    }
+    scripts[i].parentElement.replaceChild(s, scripts[i]);
+  }
+})();
+(function() {
+  var links = document.getElementsByTagName('a');
+  for (var i = 0; i < links.length; i++) {
+    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
+      links[i].target = '_blank';
+    }
+  }
+})();
+// adds .remark-code-has-line-highlighted class to <pre> parent elements
+// of code chunks containing highlighted lines with class .remark-code-line-highlighted
+(function(d) {
+  const hlines = d.querySelectorAll('.remark-code-line-highlighted');
+  const preParents = [];
+  const findPreParent = function(line, p = 0) {
+    if (p > 1) return null; // traverse up no further than grandparent
+    const el = line.parentElement;
+    return el.tagName === "PRE" ? el : findPreParent(el, ++p);
+  };
+
+  for (let line of hlines) {
+    let pre = findPreParent(line);
+    if (pre && !preParents.includes(pre)) preParents.push(pre);
+  }
+  preParents.forEach(p => p.classList.add("remark-code-has-line-highlighted"));
+})(document);</script>
+
+<script>
+slideshow._releaseMath = function(el) {
+  var i, text, code, codes = el.getElementsByTagName('code');
+  for (i = 0; i < codes.length;) {
+    code = codes[i];
+    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
+      text = code.textContent;
+      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
+          /^\$\$(.|\s)+\$\$$/.test(text) ||
+          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
+        code.outerHTML = code.innerHTML;  // remove <code></code>
+        continue;
+      }
+    }
+    i++;
+  }
+};
+slideshow._releaseMath(document);
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>

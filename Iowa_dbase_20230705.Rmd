@@ -788,7 +788,11 @@ thayden@usgs.gov
 
 https://github.com/ocean-tracking-network/glatos
 
-Github repository of presentation:
+Github repository (download all code and data for presentation):
+https://github.com/haydento/Iowa_dbase
+
+View presentation:
+haydento.github.io/Iowa_dbase/
 
 
 

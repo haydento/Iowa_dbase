@@ -784,10 +784,12 @@ Todd Hayden
 thayden@usgs.gov
 
 
-`glatos` website:
+`glatos` website:\
+
 https://github.com/ocean-tracking-network/glatos
 
-Github repository (download all code and data for presentation):
+Github repository (download all code and data for presentation):\
+
 https://github.com/haydento/Iowa_dbase
 
 

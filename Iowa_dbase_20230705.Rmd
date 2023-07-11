@@ -20,7 +20,7 @@ style_mono_light(
   text_font_google   = google_font("Montserrat", "300", "300i"),
   code_font_google   = google_font("Fira Mono"),
   base_font_size = '20px',
-  text_font_size = '1.3rem',
+  text_font_size = '1.2rem',
   code_font_size = '0.6rem'
 )
 ```
@@ -33,7 +33,7 @@ xaringanExtra::use_fit_screen()
 class: inverse, center, middle
 
 
-# Wrangling telemetry data
+# Wrangling telemetry data with R
 
 
 <img src="images/GLATOS_receivers.png" width="500px"/>
@@ -52,7 +52,7 @@ background-size: 10%
 
 ---
 
-# Wrangling telemetry data
+# Wrangling telemetry data with R
 
 ### Output
   1. Detections with animal metadata (ID, length, weight, etc)
@@ -170,7 +170,7 @@ https://github.com/ocean-tracking-network/glatos/wiki/installation-instructions
 	 + read tag specification data from an MS Excel workbook (\*.xls file), source- Innovasea
 
 ---
-# Converting data to glatos detection export output
+# Creating `glatos` detection output
 
 1. Load data into R using some other function (e.g., *read_csv*)
 
@@ -280,6 +280,12 @@ str(rec_dep)
 .panel[.panel-name[Process]
 
 ```{r rec_dep2, message=FALSE}
+# simplify for workshop
+rec_dep <- rec_dep[, c("GLATOS_ARRAY", "STATION_NO", "CONSECUTIVE_DEPLOY_NO",
+                       "GLATOS_DEPLOY_DATE_TIME", "GLATOS_TIMEZONE", "DEPLOY_LAT",
+                       "DEPLOY_LONG", "INS_MODEL_NO", "INS_SERIAL_NO",
+                       "GLATOS_PROJECT")]
+
 # Need to calculate recover_date_time from GLATOS_recover_date_time and GLATOS_timezone
 rec_dep[, DEPLOY_DATE_TIME := fast_strptime(GLATOS_DEPLOY_DATE_TIME,
                                              format = "%Y-%m-%d %H:%M",
@@ -381,7 +387,11 @@ recs <- rec_recover[rec_dep, .(GLATOS_ARRAY = i.GLATOS_ARRAY,
 .panel[.panel-name[Table]
 
 ```{r, recs_out, echo=FALSE}
-recs
+
+kableExtra::kbl(recs[1:12], align="c") %>%
+  kableExtra::kable_styling(bootstrap_options=c("striped", "hover", "condensed"), font_size = 11, position="center", full_width= TRUE) %>%
+  column_spec(c(4,10), background= "cornsilk")
+
 ```
 ]
 ]
@@ -465,7 +475,9 @@ tag[, TAG_ID_CODE := as.character(TAG_ID_CODE)]
 .panel[.panel-name[Output]
 
 ```{r tag_out, message=FALSE, echo=FALSE}
-str(tag)
+
+kableExtra::kbl(tag[1:10], align="c") %>%
+  kableExtra::kable_styling(bootstrap_options=c("striped", "hover", "condensed"), font_size = 10, position="center", full_width= TRUE)
 ```
 ]
 ]
@@ -591,7 +603,9 @@ setnames(dtc, c("Sensor Value", "Sensor Unit"), c("sensor_value", "sensor_unit")
 .panel[.panel-name[Table]
 
 ```{r dtc_out, echo=FALSE}
-str(dtc)
+kableExtra::kbl(dtc[1:8], align="c") %>%
+  kableExtra::kable_styling(bootstrap_options=c("striped", "hover", "condensed"), font_size = 10, position="center", full_width= TRUE)
+
 ```
 ]
 ]
@@ -682,7 +696,9 @@ dtc <- tag[dtc, .(ANIMAL_ID,
 
 .panel[.panel-name[Output]
 ```{r animal_idJoin, echo=FALSE}
-dtc
+kableExtra::kbl(dtc[1:10], align="c") %>%
+  kableExtra::kable_styling(bootstrap_options=c("striped", "hover", "condensed"), font_size = 14, position="center", full_width= TRUE) %>% column_spec(c(1), background= "cornsilk")
+
 ```
 ]
 ]
@@ -769,30 +785,27 @@ dtc <- recs[dtc, .(ANIMAL_ID,
 
 .panel[.panel-name[Output]
 ```{r final, echo=FALSE}
-head(dtc, n=10)
+kableExtra::kbl(dtc[1:6], align="c") %>%
+  kableExtra::kable_styling(bootstrap_options=c("striped", "hover", "condensed"), font_size = 12, position="center", full_width= TRUE) %>% column_spec(c(10,11), background= "cornsilk")
+
+
 ```
 ]
 ]
 
 ---
 
-# Thanks!
+.center[
+## Thanks!
+]
 
-For help, contact:
+### Contact: Todd Hayden (thayden@usgs.gov)
 
-Todd Hayden
-thayden@usgs.gov
+### `glatos`: https://github.com/ocean-tracking-network/glatos
 
+### Slides and code repository: https://github.com/haydento/Iowa_dbase
 
-`glatos` website:\
-
-https://github.com/ocean-tracking-network/glatos
-
-Github repository (download all code and data for presentation):\
-
-https://github.com/haydento/Iowa_dbase
-
-
+### Presentation (online): https://haydento.github.io/Iowa_dbase/
 
 
 

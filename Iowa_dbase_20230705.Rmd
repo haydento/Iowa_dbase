@@ -23,6 +23,7 @@ style_mono_light(
   text_font_size = '1.2rem',
   code_font_size = '0.6rem'
 )
+library(kableExtra)
 ```
 ```{r xaringan-panelset, echo=FALSE}
 xaringanExtra::use_panelset()
@@ -272,8 +273,10 @@ rec_dep <- data.table::fread("ex_glatos_submission/HECWL_GLATOS_Deployment.csv")
 .panel[.panel-name[Peek]
 ```{r rec_dep1.5, message=FALSE, echo=FALSE}
 
-# take a look
-str(rec_dep)
+kableExtra::kbl(rec_dep[1:10,], align="c") %>%
+  kableExtra::kable_styling(bootstrap_options=c("striped", "hover", "condensed"), font_size=12, position="center", full_width=TRUE) %>%
+  scroll_box(width="1100px")
+
 ```
 ]
 
@@ -300,7 +303,10 @@ rec_dep[, INS_SERIAL_NO := as.character(INS_SERIAL_NO)]
 
 .panel[.panel-name[Output]
 ```{r rec_dep3, echo=FALSE}
-str(rec_dep)
+
+kableExtra::kbl(rec_dep[1:10,], align="c") %>%
+  kableExtra::kable_styling(bootstrap_options=c("striped", "hover", "condensed"), font_size=12, position="center", full_width=TRUE) %>%
+  scroll_box(width="1100px")
 
 ```
 ]
@@ -323,8 +329,11 @@ rec_recover <- data.table::fread("ex_glatos_submission/HECWL_GLATOS_Recovery.csv
 .panel[.panel-name[Peek]
 
 ```{r recovery1.5, echo=FALSE}
-# take a look
-str(rec_recover)
+
+kableExtra::kbl(rec_recover[1:10,], align="c") %>%
+  kableExtra::kable_styling(bootstrap_options=c("striped", "hover", "condensed"), font_size=12, position="center", full_width=TRUE) %>%
+  scroll_box(width="1100px")
+
 ```
 ]
 
@@ -345,8 +354,12 @@ rec_recover[, INS_SERIAL_NUMBER := as.character(INS_SERIAL_NUMBER)]
 ]
 
 .panel[.panel-name[Output]
+
 ```{r recovery3, echo=FALSE}
-str(rec_recover)
+kableExtra::kbl(rec_recover[1:10,], align="c") %>%
+  kableExtra::kable_styling(bootstrap_options=c("striped", "hover", "condensed"), font_size=12, position="center", full_width=TRUE) %>%
+  scroll_box(width="1100px")
+
 ```
 ]
 ]
@@ -445,8 +458,11 @@ tag <- fread("ex_glatos_submission/HECWL_GLATOS_Tagging.csv")
 
 .panel[.panel-name[Peek]
 ```{r tag1, echo=FALSE}
-# take a look
-str(tag)
+
+kableExtra::kbl(tag[1:8,], align="c") %>%
+  kableExtra::kable_styling(bootstrap_options=c("striped", "hover", "condensed"), font_size=12, position="center", full_width=TRUE) %>%
+  scroll_box(width="1100px")
+
 ```
 ]
 
@@ -477,7 +493,8 @@ tag[, TAG_ID_CODE := as.character(TAG_ID_CODE)]
 ```{r tag_out, message=FALSE, echo=FALSE}
 
 kableExtra::kbl(tag[1:10], align="c") %>%
-  kableExtra::kable_styling(bootstrap_options=c("striped", "hover", "condensed"), font_size = 10, position="center", full_width= TRUE)
+  kableExtra::kable_styling(bootstrap_options=c("striped", "hover", "condensed"), font_size = 10, position="center", full_width= TRUE) %>% scroll_box(width="1100px")
+
 ```
 ]
 ]
@@ -566,7 +583,15 @@ dtc <- fread("ex_glatos_submission/EX_IOWA_export.csv", sep=",", header=TRUE, fi
 .panel[.panel-name[Peek]
 
 ```{r dtc1, echo=FALSE}
-str(dtc)
+
+
+
+
+kableExtra::kbl(dtc[1:5,], align="c") %>%
+  kableExtra::kable_styling(bootstrap_options=c("striped", "hover", "condensed"), font_size=12, position="center", full_width=TRUE) %>%
+  scroll_box(width="1100px")
+
+
 ```
 ]
 
@@ -604,7 +629,8 @@ setnames(dtc, c("Sensor Value", "Sensor Unit"), c("sensor_value", "sensor_unit")
 
 ```{r dtc_out, echo=FALSE}
 kableExtra::kbl(dtc[1:8], align="c") %>%
-  kableExtra::kable_styling(bootstrap_options=c("striped", "hover", "condensed"), font_size = 10, position="center", full_width= TRUE)
+  kableExtra::kable_styling(bootstrap_options=c("striped", "hover", "condensed"), font_size = 10, position="center", full_width= TRUE) %>%
+  scroll_box(width="1100px")
 
 ```
 ]
@@ -660,15 +686,23 @@ render_graph(grph)
 # Add 'animal_id' to detections
 
 .panelset[
-.panel[.panel-name[Tagging]
+.panel[.panel-name[Tags]
 ```{r tagjoin, echo=FALSE}
-str(tag)
+
+kableExtra::kbl(tag[1:10,], align="c") %>%
+  kableExtra::kable_styling(bootstrap_options=c("striped", "hover", "condensed"), font_size=12, position="center", full_width=TRUE) %>%
+  scroll_box(width="1100px")
+
 ```
 ]
 
 .panel[.panel-name[Detections]
 ```{r tagjoindtc, echo=FALSE}
-str(dtc)
+
+kableExtra::kbl(dtc[1:6,], align="c") %>%
+  kableExtra::kable_styling(bootstrap_options=c("striped", "hover", "condensed"), font_size=12, position="center", full_width=TRUE) %>%
+  scroll_box(width="1100px")
+
 ```
 ]
 
@@ -697,7 +731,8 @@ dtc <- tag[dtc, .(ANIMAL_ID,
 .panel[.panel-name[Output]
 ```{r animal_idJoin, echo=FALSE}
 kableExtra::kbl(dtc[1:10], align="c") %>%
-  kableExtra::kable_styling(bootstrap_options=c("striped", "hover", "condensed"), font_size = 14, position="center", full_width= TRUE) %>% column_spec(c(1), background= "cornsilk")
+  kableExtra::kable_styling(bootstrap_options=c("striped", "hover", "condensed"), font_size = 14, position="center", full_width= TRUE) %>% column_spec(c(1), background= "cornsilk") %>%
+  scroll_box(width="1100px")
 
 ```
 ]
@@ -749,13 +784,20 @@ render_graph(grph)
 .panelset[
 .panel[.panel-name[Receivers]
 ```{r tagjoin1, echo=FALSE}
-str(recs)
+
+kableExtra::kbl(recs[1:8,], align="c") %>%
+  kableExtra::kable_styling(bootstrap_options=c("striped", "hover", "condensed"), font_size=12, position="center", full_width=TRUE) %>%
+  scroll_box(width="1100px")
+
 ```
 ]
 
 .panel[.panel-name[Detections]
 ```{r tagjoindtc1, echo=FALSE}
-str(dtc)
+
+kableExtra::kbl(dtc[1:10,], align="c") %>%
+  kableExtra::kable_styling(bootstrap_options=c("striped", "hover", "condensed"), font_size=12, position="center", full_width=TRUE)
+
 ```
 ]
 
@@ -785,9 +827,9 @@ dtc <- recs[dtc, .(ANIMAL_ID,
 
 .panel[.panel-name[Output]
 ```{r final, echo=FALSE}
+
 kableExtra::kbl(dtc[1:6], align="c") %>%
   kableExtra::kable_styling(bootstrap_options=c("striped", "hover", "condensed"), font_size = 12, position="center", full_width= TRUE) %>% column_spec(c(10,11), background= "cornsilk")
-
 
 ```
 ]
@@ -798,6 +840,8 @@ kableExtra::kbl(dtc[1:6], align="c") %>%
 .center[
 ## Thanks!
 ]
+
+</br>
 
 ### Contact: Todd Hayden (thayden@usgs.gov)
 

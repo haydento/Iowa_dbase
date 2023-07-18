@@ -53,18 +53,51 @@ background-size: 10%
 
 ---
 
+# Analyzing sorta large data (_or_ how do we deal with millions of detections?)
+
+.pull-left[
+### Excel/VUE
+- Familiar point and click but not repeatable
+- Software limitations (max number of rows)
+- Complex database functionality difficult to implement
+- Limited visualization and analysis capabilities (VUE)
+- Proprietary, "black box"
+]
+
+.pull-right[
+### Programming language
+- Designed to handle complex and large datasets
+- Requires programming experience, computer science "mentality"
+- Substantial learning curve
+- **Repeatable, self-documenting**
+- One program to rule them all (analysis, visualizations, presentations, manuscripts)
+- Many free and open source, can inspect/modify code
+]
+
+
+---
 # Wrangling telemetry data with R
 
+.pull-left[
+### Input
+  1. Detections
+  2. Receiver deployment
+  3. Receiver recovery
+  4. Tag deployment and recovery
+]
+
+.pull-right[
 ### Output
-  1. Detections with animal metadata (ID, length, weight, etc)
+  1. Detections with animal metadata (ID, etc)
   2. Detections with location (lat/lon)
-  3. Transmissions before after receiver recovery are removed
-  4. Tags that are not associated with fish area removed
+  3. **Transmissions before/after receiver recovery are removed**
+  4. **Tags that are not associated with fish are removed**
+]
 
-#### AND
-
-  3. Standardized column names and data types
-
+.center[
+### AND  
+Standardized column names and data types
+]
 ---
 
 # GLATOS database
@@ -708,6 +741,11 @@ kableExtra::kbl(dtc[1:6,], align="c") %>%
 
 .panel[.panel-name[Join data]
 ```{r join_tag_and_dtc}
+
+# replace NA in GLATOS_recap_date with "infinity" in Tag data
+tag[is.na(GLATOS_recap_date), GLATOS_recap_date := Inf]
+
+
 
 # join animal_id to detections with data.table non-equi join
 dtc <- tag[dtc, .(ANIMAL_ID,
